@@ -1,0 +1,100 @@
+@startuml C4_Containers
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Диаграмма контейнеров системы "Будущее 2.0" (целевая архитектура)
+
+Person(operator, "Оператор клиники", "Сотрудник клиники")
+Person(analyst, "Бизнес-аналитик", "Сотрудник для анализа данных")
+Person(client, "Клиент", "Пациент/клиент банка")
+
+System_Boundary(future_system, "Экосистема Будущее 2.0") {
+    
+    Container_Boundary(frontend, "Фронтенд") {
+        Container(web_portal, "Веб-портал", "React/TypeScript", "Единый портал самообслуживания")
+        Container(operator_ui, "Интерфейс оператора", "React", "Рабочее место оператора клиники")
+        Container(mobile_app, "Мобильное приложение", "React Native", "Приложение для клиентов")
+    }
+    
+    Container_Boundary(api_gateway, "API Gateway") {
+        Container(kong, "Kong API Gateway", "Kong", "Единая точка входа, управление API, авторизация")
+    }
+    
+    Container_Boundary(medical_domain, "Медицинский домен") {
+        Container(medical_api, "Medical API", "Python/FastAPI", "API медицинских сервисов")
+        Container(medical_db, "Medical DB", "PostgreSQL", "База медицинских данных")
+        Container(ai_services, "AI Services", "Python/TensorFlow", "ИИ для диагностики и анализа")
+    }
+    
+    Container_Boundary(fintech_domain, "Финтех домен") {
+        Container(fintech_api, "Fintech API", "Golang", "API финансовых сервисов")
+        Container(fintech_db, "Fintech DB", "PostgreSQL", "База финансовых данных")
+        Container(payment_service, "Payment Service", "Java", "Сервис платежей")
+    }
+    
+    Container_Boundary(data_platform, "Платформа данных") {
+        Container(data_lake, "Data Lake", "S3/MinIO", "Озеро данных")
+        Container(kafka, "Apache Kafka", "Kafka", "Потоковая обработка событий")
+        Container(airflow, "Apache Airflow", "Python", "Оркестрация ETL процессов")
+        Container(clickhouse, "ClickHouse", "ClickHouse", "OLAP хранилище для аналитики")
+    }
+    
+    Container_Boundary(analytics, "Аналитическая платформа") {
+        Container(bi_tool, "Apache Superset", "Python", "Self-service BI платформа")
+        Container(metabase, "Метабаза данных", "PostgreSQL", "Каталог данных и метаданные")
+    }
+    
+    Container_Boundary(infrastructure, "Инфраструктурные сервисы") {
+        Container(auth_service, "Auth Service", "Keycloak", "Единая система авторизации")
+        Container(monitoring, "Monitoring", "Prometheus/Grafana", "Мониторинг и алерты")
+    }
+}
+
+System_Ext(pharma_system, "Система фарм. компании", "Внешняя система партнера")
+System_Ext(equipment_system, "Система производителя оборудования", "Внешняя система партнера")
+
+' Границы безопасности
+Boundary(dmz, "DMZ", "type=security") {
+}
+
+Boundary(internal, "Internal Network", "type=security") {
+}
+
+Boundary(restricted, "Restricted Zone", "type=security") {
+}
+
+' Связи с типами каналов и данными
+Rel(operator, operator_ui, "HTTPS", "Медицинские операции")
+Rel(analyst, web_portal, "HTTPS", "Аналитические запросы")
+Rel(client, mobile_app, "HTTPS", "Личные данные")
+
+Rel(web_portal, kong, "HTTPS/REST", "Агрегированные данные")
+Rel(operator_ui, kong, "HTTPS/REST", "Операционные данные")
+Rel(mobile_app, kong, "HTTPS/REST", "Персональные данные")
+
+Rel(kong, medical_api, "REST/mTLS", "Медицинские запросы")
+Rel(kong, fintech_api, "REST/mTLS", "Финансовые операции")
+Rel(kong, auth_service, "OAuth2.0/OIDC", "Токены доступа")
+
+Rel(medical_api, medical_db, "SQL/TLS", "Медкарты, диагнозы")
+Rel(medical_api, ai_services, "gRPC/TLS", "Анонимизированные снимки")
+Rel(fintech_api, fintech_db, "SQL/TLS", "Транзакции, счета")
+Rel(fintech_api, payment_service, "REST/mTLS", "Платежные поручения")
+
+Rel(medical_api, kafka, "Avro/SASL", "События: визиты, диагнозы")
+Rel(fintech_api, kafka, "JSON/SASL", "События: транзакции")
+
+Rel(kafka, data_lake, "Streaming/TLS", "Сырые события")
+Rel(airflow, data_lake, "S3 API", "Batch данные")
+Rel(airflow, clickhouse, "ClickHouse Protocol", "Агрегаты")
+
+Rel(bi_tool, clickhouse, "SQL/TLS", "Аналитические запросы")
+Rel(bi_tool, metabase, "REST", "Метаданные")
+
+Rel(pharma_system, kong, "REST/OAuth", "Заказы, поставки")
+Rel(equipment_system, kong, "REST/OAuth", "Данные оборудования")
+
+' CDC для legacy
+Container(cdc_tool, "CDC Tool", "Debezium/Qlik", "Change Data Capture из SQL Server")
+Rel(cdc_tool, kafka, "Avro/SASL", "Изменения из DWH")
+
+@enduml

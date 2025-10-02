@@ -1,0 +1,207 @@
+@startuml DFD_Domains
+!define RECTANGLE class
+
+skinparam backgroundColor #FAFAFA
+skinparam rectangle {
+    BackgroundColor<<domain>> #E8F4F8
+    BorderColor<<domain>> #2E86AB
+    BackgroundColor<<external>> #FFE5CC
+    BorderColor<<external>> #FF6B35
+    BackgroundColor<<platform>> #E8E8E8
+    BorderColor<<platform>> #666666
+}
+
+title Data Flow Diagram - Архитектура доменов "Будущее 2.0"
+
+' Внешние системы
+RECTANGLE "Клиенты" <<external>> {
+    RECTANGLE mobile_clients [
+        Мобильные клиенты
+    ]
+    RECTANGLE web_clients [
+        Веб-клиенты  
+    ]
+}
+
+RECTANGLE "Партнеры" <<external>> {
+    RECTANGLE pharma [
+        Фармацевтические
+        компании
+    ]
+    RECTANGLE equipment [
+        Производители
+        оборудования
+    ]
+}
+
+' Домены
+RECTANGLE "Медицинский домен" <<domain>> {
+    RECTANGLE medical_core [
+        **Ядро медицинских сервисов**
+        ----
+        - Медицинские карты
+        - История болезней
+        - Расписание приемов
+        - Управление клиниками
+    ]
+    
+    RECTANGLE ai_diagnostics [
+        **ИИ диагностика**
+        ----
+        - Анализ снимков
+        - Предсказание диагнозов
+        - Рекомендации лечения
+    ]
+}
+
+RECTANGLE "Финансовый домен" <<domain>> {
+    RECTANGLE banking_core [
+        **Банковское ядро**
+        ----
+        - Счета клиентов
+        - Кредиты
+        - Платежи
+        - Транзакции
+    ]
+    
+    RECTANGLE billing [
+        **Биллинг медуслуг**
+        ----
+        - Счета за лечение
+        - Страховые случаи
+        - Взаиморасчеты
+    ]
+}
+
+RECTANGLE "Домен поставок" <<domain>> {
+    RECTANGLE inventory [
+        **Управление запасами**
+        ----
+        - Медикаменты
+        - Оборудование
+        - Расходные материалы
+    ]
+    
+    RECTANGLE procurement [
+        **Закупки**
+        ----
+        - Заказы поставщикам
+        - Контроль поставок
+        - Управление контрактами
+    ]
+}
+
+RECTANGLE "HR домен" <<domain>> {
+    RECTANGLE hr_core [
+        **Управление персоналом**
+        ----
+        - Кадровый учет
+        - Расписания
+        - Зарплаты
+        - Обучение
+    ]
+}
+
+' Платформенные сервисы
+RECTANGLE "Платформа данных" <<platform>> {
+    RECTANGLE event_bus [
+        **Event Bus**
+        (Apache Kafka)
+        ----
+        Потоковая передача событий
+    ]
+    
+    RECTANGLE data_lake [
+        **Data Lake**
+        ----
+        Сырые данные
+    ]
+    
+    RECTANGLE analytics_db [
+        **Analytics DB**
+        (ClickHouse)
+        ----
+        Витрины данных
+    ]
+}
+
+RECTANGLE "Аналитическая платформа" <<platform>> {
+    RECTANGLE bi_platform [
+        **Self-Service BI**
+        ----
+        Конструктор отчетов
+        Дашборды
+    ]
+    
+    RECTANGLE data_catalog [
+        **Каталог данных**
+        ----
+        Метаданные
+        Линейность данных
+    ]
+}
+
+RECTANGLE "API Gateway" <<platform>> {
+    RECTANGLE api_gw [
+        **Kong Gateway**
+        ----
+        Маршрутизация
+        Авторизация
+        Rate limiting
+    ]
+}
+
+' Потоки данных с типами каналов
+mobile_clients --> api_gw : "HTTPS/REST\n[Персональные данные]"
+web_clients --> api_gw : "HTTPS/REST\n[Аналитические запросы]"
+pharma --> api_gw : "REST/OAuth\n[Заказы, поставки]"
+equipment --> api_gw : "REST/OAuth\n[Данные оборудования]"
+
+api_gw --> medical_core : "REST/mTLS\n[Медицинские запросы]"
+api_gw --> banking_core : "REST/mTLS\n[Финансовые операции]"
+api_gw --> inventory : "REST/mTLS\n[Запросы инвентаря]"
+api_gw --> hr_core : "REST/mTLS\n[HR запросы]"
+
+medical_core --> event_bus : "Avro/SASL\n[События: приемы,\nдиагнозы (псевдоним.)]"
+banking_core --> event_bus : "JSON/SASL\n[События: платежи,\nтранзакции]"
+inventory --> event_bus : "Avro/SASL\n[События: движение\nтоваров]"
+hr_core --> event_bus : "JSON/SASL\n[События: изменения\nперсонала]"
+billing --> event_bus : "JSON/SASL\n[События: счета]"
+procurement --> event_bus : "Avro/SASL\n[События: заказы]"
+
+medical_core --> ai_diagnostics : "gRPC/TLS\n[Анонимизированные\nданные]"
+ai_diagnostics --> medical_core : "gRPC/TLS\n[Результаты AI]"
+
+medical_core --> billing : "REST/mTLS\n[Услуги для\nтарификации]"
+billing --> banking_core : "REST/mTLS\n[Счета к оплате]"
+
+inventory --> procurement : "REST\n[Потребности]"
+procurement --> inventory : "REST\n[Поступления]"
+
+event_bus --> data_lake : "Kafka/TLS\n[Streaming событий]"
+data_lake --> analytics_db : "S3/ClickHouse\n[Агрегированные\nданные]"
+
+analytics_db --> bi_platform : "SQL/TLS\n[Аналитические\nзапросы]"
+data_catalog --> bi_platform : "REST\n[Метаданные]"
+
+bi_platform --> web_clients : "HTTPS\n[Отчеты, дашборды\nбез персональных\nданных]"
+
+' CDC для legacy
+RECTANGLE "CDC Tool" <<platform>> {
+    RECTANGLE cdc_component [
+        **CDC из Legacy DWH**
+        ----
+        Debezium/Qlik Replicate
+    ]
+}
+cdc_component --> event_bus : "Avro/SASL\n[Изменения из DWH]"
+
+' Легенда
+legend right
+    |= Цвет |= Тип |
+    |<#E8F4F8> | Бизнес-домен |
+    |<#FFE5CC> | Внешняя система |
+    |<#E8E8E8> | Платформа |
+endlegend
+
+@enduml
